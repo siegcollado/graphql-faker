@@ -105,8 +105,7 @@ export function fakeSchema(schema) {
   }
 
   function getFieldResolver(field) {
-    const type = field.type as GraphQLOutputType;
-    const fakeResolver = getResolver(type, field);
+    const fakeResolver = getResolver(field.type, field);
     return (source, _0, _1, info) => {
       const value = getCurrentSourceProperty(source, info.path);
       return (value !== undefined) ? value : fakeResolver();
@@ -133,18 +132,39 @@ export function fakeSchema(schema) {
       return getResolver(type.ofType, field);
     if (type instanceof GraphQLList)
       return arrayResolver(getResolver(type.ofType, field));
+
     if (isAbstractType(type))
       return abstractTypeResolver(type);
-    if (isLeafType(type))
-      return getLeafResolver(type, field);
-    // TODO: error on fake directive
-    // TODO: handle @examples
-    return () => ({});
+
+    return fieldResolver(type, field);
   }
+
 
   function abstractTypeResolver(type:GraphQLAbstractType) {
     const possibleTypes = schema.getPossibleTypes(type);
     return () => ({__typename: getRandomItem(possibleTypes)});
+  }
+}
+
+function fieldResolver(type:GraphQLOutputType, field) {
+  const directiveToArgs = {
+    ...getFakeDirectives(type),
+    ...getFakeDirectives(field),
+  };
+  const {fake, examples} = directiveToArgs;
+
+  if (examples)
+    return () => getRandomItem(examples.values)
+
+  if (isLeafType(type)) {
+    if (fake) {
+      return () => fakeValue(fake.type, fake.options, fake.locale);
+    }
+
+    return getLeafResolver(type);
+  } else {
+    // TODO: error on fake directive
+    return () => ({});
   }
 }
 
@@ -172,18 +192,7 @@ function getFakeDirectives(object: any) {
   return result;
 }
 
-function getLeafResolver(type:GraphQLLeafType, field) {
-  const directiveToArgs = {
-    ...getFakeDirectives(type),
-    ...getFakeDirectives(field),
-  };
-
-  let {fake, examples} = directiveToArgs;
-  if (examples)
-    return () => getRandomItem(examples.values)
-  if (fake)
-    return () => fakeValue(fake.type, fake.options, fake.locale);
-
+function getLeafResolver(type:GraphQLLeafType) {
   if (type instanceof GraphQLEnumType) {
     const values = type.getValues().map(x => x.value);
     return () => getRandomItem(values);
