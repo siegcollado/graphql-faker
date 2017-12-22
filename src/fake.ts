@@ -153,6 +153,7 @@ const fakeFunctions = {
   jobTitle: () => faker.name.jobTitle(),
 
   //FIXME: phone number
+  phoneNumber: () => faker.phone.phoneNumber(),
 
   uuid: () => faker.random.uuid(),
   word: () => faker.random.word(),
